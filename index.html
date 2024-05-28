@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery a Mapa</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+</head>
+<body>
+<div class="content">
+    <div class="gallery">
+        <h1 class="heading">Gallery</h1>
+    </div>
+    <div id="map"></div>
+</div>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const galleryDiv = document.querySelector('.gallery')
+        let map
+        let activeImage = null
+
+        async function fetchImages() {
+            const response = await fetch('http://localhost:3000/api/images')
+            return await response.json()
+        }
+
+        function createImageElement(image) {
+            const img = document.createElement('img')
+            img.src = `http://localhost:3000/content/${image.name}`
+            img.alt = image.name
+            img.classList.add('gallery-image')
+            return img
+        }
+
+        function setupMap(lat, lon) {
+            map = L.map('map').setView([lat, lon], 13)
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map)
+        }
+
+        function activateImage(img) {
+            if (activeImage) {
+                activeImage.classList.remove('active')
+            }
+            img.classList.add('active')
+            activeImage = img
+            img.scrollIntoView({ behavior: 'instant', block: 'center' })
+        }
+
+        function setupMarker(image, marker, img) {
+            marker.on('click', () => {
+                map.setView([image.coordinates.latitude, image.coordinates.longitude], 20)
+                marker.openPopup()
+                activateImage(img)
+            })
+        }
+
+        function setupImageClick(img, marker, image) {
+            img.addEventListener('click', () => {
+                map.setView([image.coordinates.latitude, image.coordinates.longitude], 20)
+                marker.openPopup()
+                activateImage(img)
+            })
+        }
+
+        fetchImages().then(images => {
+            if (images.length > 0) {
+                const firstImage = images[0]
+                setupMap(firstImage.coordinates.latitude, firstImage.coordinates.longitude)
+
+                const fragment = document.createDocumentFragment()
+
+                images.forEach(image => {
+                    const img = createImageElement(image)
+                    fragment.appendChild(img)
+
+                    if (image.coordinates.latitude && image.coordinates.longitude) {
+                        const marker = L.marker([image.coordinates.latitude, image.coordinates.longitude])
+                            .addTo(map)
+                            .bindPopup(`
+                                <div style="text-align: center;">
+                                    <img src="http://localhost:3000/content/${image.name}" alt="${image.name}" style="width: 100px; height: auto;">
+                                </div>
+                            `)
+
+                        setupImageClick(img, marker, image)
+                        setupMarker(image, marker, img)
+                    }
+                })
+
+                galleryDiv.appendChild(fragment)
+
+                console.log(images.map(image => image.name))
+            } else {
+                console.error('No images available')
+            }
+        }).catch(error => console.error('Error fetching images:', error))
+    })
+</script>
+</body>
+</html>
